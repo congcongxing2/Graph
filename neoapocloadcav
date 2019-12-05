@@ -1,0 +1,49 @@
+import pandas as pd
+import numpy as np
+from py2neo import Graph
+import time
+
+t0=time.time()
+test_graph=Graph("http://localhost:11003", username="GraphAlgo",password="12345677")
+query="match(n) detach delete n"
+test_graph.run(query)
+t1=time.time()
+time0=t1-t0
+print("stage0:previous data cleared")
+print("stage0 time cost:",time0)
+
+########APOC LOAD airports####
+t00=time.time()
+query="""CALL apoc.load.csv('file:///C:/Users/Congcong/.Neo4jDesktop/neo4jDatabases/database-867cb3a7-6c8e-4b19-9df4-1f553368dae4/installation-3.3.2/import/cleanairport.csv',{sep:","})  YIELD map
+CALL apoc.create.node(['airport'], {id:map.id}) YIELD node 
+RETURN count(*)"""
+t11=time.time()
+test_graph.run(query)
+time1=t11-t00
+print("stage1 airport loaded")
+print("stage1 time cost:",time1)
+
+#######APOC Load airline csv####
+t000=time.time()
+query="""CALL apoc.load.csv('file:///C:/Users/Congcong/.Neo4jDesktop/neo4jDatabases/database-867cb3a7-6c8e-4b19-9df4-1f553368dae4/installation-3.3.2/import/cleanairline.csv',{sep:","})  YIELD map
+CALL apoc.create.node(['airline'], {code:map.code}) YIELD node 
+RETURN count(*)"""
+test_graph.run(query)
+t111=time.time()
+time2=t111-t000
+print("stage2 airline loaded")
+print("stage2 time cost:",time2)
+
+#####APOC LOAD flights######
+st0000=time.time()
+query="""CALL apoc.load.csv('file:///C:/Users/Congcong/.Neo4jDesktop/neo4jDatabases/database-867cb3a7-6c8e-4b19-9df4-1f553368dae4/installation-3.3.2/import/cleanrelationships.csv',{sep:","})  YIELD map
+MATCH (o:airport), (d:airport)
+WHERE o.id = 'map.ORIGIN'
+AND d.id = 'map.DEST'
+CALL apoc.create.relationship(o, "flight",{date:'map.FL_DATE'}, d) YIELD rel
+REMOVE rel.noOp"""
+test_graph.run(query)
+t1111=time.time()
+time3=t111-t0000
+print("stage3 flights loaded")
+print("stage3 time cost:",time3)

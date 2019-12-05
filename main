@@ -1,0 +1,320 @@
+###packages###
+from py2neo import Node, Relationship
+from py2neo import Graph, cypher
+import networkx as nwx
+import matplotlib.pyplot as plt
+import mysql.connector
+import pandas
+import requests
+import time
+from xml.dom import minidom
+from xml.dom.minidom import Node
+
+username1="GraphRDF"
+username2="Graphmetabase"
+password="12345677"
+
+filename1="DCU_LIVESTOCKNUMBERS"
+fileaddress1="file:///Users/Congcong/Desktop/owl/input/"+filename1+".csv"
+filename2="DCU_MANAGEMENDECISIONS"
+fileaddress2="file:///Users/Congcong/Desktop/owl/input/"+filename2+".csv"
+filename3 = "DCU_PADDOCKESTIMATIONS"
+fileaddress3="file:///Users/Congcong/Desktop/owl/input/"+filename3+".csv"
+filename4 = "dcu_pbi_cow"
+fileaddress4="file:///Users/Congcong/Desktop/owl/input/"+filename4+".csv"
+filename5="dcu_pbi_lactation"
+fileaddress5="file:///Users/Congcong/Desktop/owl/input/"+filename5+".csv"
+
+##################################################################################################
+############################# csv to rdf ###############################
+#########################################################################################
+def csvfileload(filename1, fileaddress1):
+    data1=pandas.read_csv(fileaddress1, header=0)
+    table1=filename1
+    column1=[]
+    for col in data1.columns:
+        col='_'.join(col.split())
+        print(col)
+        column1.append(col)
+
+
+    ####CONNECT GRAGH###
+    #test_graph = Graph("http://localhost:7474", username="GraphRDF", password="12345677")
+    #query = "match(n) detach delete n"
+    #test_graph.run(query)
+    # cypher=test_graph.cypher
+    #print("####graphdb connected#####")
+
+    t = 0
+    table=[table1]
+    #query = "create constraint on (a:table) assert a.name is unique"
+    #test_graph.run(query)
+    print("Loading tables......")
+
+    query = "create (:" + table[0] + "{name:" + "'" + table[0] + "'" + ", type: 'table', loadmark:'"+filename1+"'})"
+    test_graph.run(query)
+    print("###### Table Loaded ######")
+
+    c = 0
+    #query = "create constraint on (a:column) assert a.name is unique"
+    #test_graph.run(query)
+    print("Loading columns......")
+    lc1=len(column1)
+    while c < lc1:
+        query = "create (:" + column1[c] + "{name:" + "'" + column1[c] + "'" + ", type: 'column', loadmark:'"+filename1+"'})"
+        test_graph.run(query)
+        query = "match (b),(c) where b.name='" + table[0] + "' and c.name='" + column1[c] + "' merge (c)-[:belong_to{intable:'" + table[0] + "'" + ", cost:1}]->(b)"
+        test_graph.run(query)
+        c = c + 1
+
+    print("###    "+filename1+"   Loaded      ###")
+
+             ##############################################################################
+
+def getrdf(outputfilename):
+    #Invoke HTTP call to neo4j to retrieve onto file credential format: username:password
+    ontoResponse = requests.get('http://neo4j:12345677@localhost:7474/rdf/onto')
+    #print(ontoResponse.text)
+    f = open("/Users/Congcong/Desktop/owl/rdfoutput/"+outputfilename+"ontoResponse.owl", "w+")
+    f.write(ontoResponse.text)
+    f.close()
+    print(ontoResponse.text)
+    print("###    file rdf file saved as : 'Desktop/owl/rdfoutput/outputfilenameontoResponse.owl'      ###")
+
+####################################################################################################
+##################### YAM #############################
+###################################################################################################
+
+def YAM(sourceFile,targetFile,YAMfile):
+
+    data = {
+        'apikey': '41lahii2if9lv01i'
+    }
+
+    files = {'sourceFile': open(sourceFile, 'rb'),
+             'targetFile': open(targetFile, 'rb')}
+
+    response = requests.post('http://yamplusplus.lirmm.fr/api/matcher', data=data, files=files)
+    print(response)
+    print(response.text)
+
+    f = open(YAMfile, "w+")
+    f.write(response.text)
+    f.close()
+
+    print("###### Alignment file saved in Desktop/owl/YAMresponse ######")
+
+######################################################################################################
+###################### parse rdf alignment to csv ##############################
+###############################################################################################
+
+def parseYAM(YAMfile,destinationfilename):
+
+
+    xmldoc = minidom.parse(YAMfile)
+    cellList = xmldoc.getElementsByTagName("Cell")
+    entity1 = []
+    entity1 = list(entity1)
+    entity2 = []
+    entity2 = list(entity2)
+    relation = []
+    relation = list(relation)
+    score = []
+    score = list(score)
+    i = 0
+    j = 0
+    for cell in cellList:
+        for x in cell.childNodes:
+            if x.nodeType != Node.TEXT_NODE:
+                if x.firstChild is not None:
+                    print("i=", i)
+
+                    print(x.firstChild.data)
+                    if i % 2 == 0:
+                        relation.append(x.firstChild.data)
+                    else:
+                        score.append(x.firstChild.data)
+                    i = i + 1
+
+                else:
+                    # print(x.tagName)
+                    for attribute, value in x.attributes.items():
+                        # print(attribute, value)
+
+                        namespace = value.split("#")
+                        print("j=", j)
+
+                        print(namespace[1])
+                        if j % 2 == 0:
+                            entity1.append(namespace[1])
+                        else:
+                            entity2.append(namespace[1])
+                        j = j + 1
+
+    print("Parsing Done: i=%s, j=%s, %s pairs matched" % (i, j, i / 2))
+
+    data = {'entity1': entity1, 'entity2': entity2, 'relation': relation, 'score': score}
+    df = pandas.DataFrame(data=data)
+    df.to_csv("/Users/Congcong/Desktop/owl/" + destinationfilename, index=False, header=True)
+
+
+
+
+    print("csv File saved in '/Users/Congcong/Desktop/owl/'")
+
+################################################################################################
+###################read csv and get intergrated##########################
+################################################################################################
+
+def integrate(YAMresultcsv):
+
+    data = pandas.read_csv(YAMresultcsv, header=0)
+    print(data)
+    entity1 = data["entity1"]
+    entity2 = data["entity2"]
+    score = data["score"]
+    print(entity1, entity2, score)
+
+    if len(entity1) == len(entity2) == len(score):
+        print("lenth check: GOOD")
+    else:
+        print("error from raw data")
+
+    i = 0
+    while i < len(entity1):
+        if score[i] > 0.8:
+            print(entity1[i], entity2[i])
+            check = input("Please confirm merge:" + entity1[i] + " and " + entity2[
+                i] + " into one Node.('Y' for comfirm, type other key to cnacel :)")
+            if check == 'Y' or check== 'y':
+                query = "MATCH (a:" + entity1[i] + " {name:'" + entity1[
+                    i] + "'}),(b:" + entity2[i] + " {name:'" + entity2[
+                            i] + "'}) where a.loadmark <> b.loadmark WITH * LIMIT 1 call apoc.refactor.mergeNodes([a,b]) yield node return 'none'"
+                test_graph.run(query)
+                print("Nodes Integrated")
+                i = i + 1
+            elif check != 'Y' or 'y':
+                i = i + 1
+
+    if i == len(entity1):
+        print("###### Integration Done. Check Neo4j ######")
+    else:
+        print("Errors occured, please check.")
+
+######################################################################################################
+###########################  database connection  ####################################################
+###############################################################################################
+
+
+
+
+######################################################################################################
+##################    MAIN   #########################
+###############################################################################################
+###########################################################################################
+#check=input("ready to connect RDF GRAPH ?('Y' or 'y' for ready): ")
+#if check=='Y' or check=='y':
+   # test_graph = Graph("http://localhost:7474", username=username1, password=password) ###connect to rdf database###
+
+#query = "match(n) detach delete n"
+#test_graph.run(query)
+#print("####graphdb cleared#####")
+#csvfileload(filename1,fileaddress1)
+#getrdf(filename1)
+targetFile1="/Users/Congcong/Desktop/owl/rdfoutput/"+filename1+"ontoResponse.owl"
+
+#query = "match(n) detach delete n"
+#test_graph.run(query)
+#print("####graphdb cleared#####")
+#csvfileload(filename2,fileaddress2)
+#getrdf(filename2)
+targetFile2="/Users/Congcong/Desktop/owl/rdfoutput/"+filename2+"ontoResponse.owl"
+
+#query = "match(n) detach delete n"
+#test_graph.run(query)
+#print("####graphdb cleared#####")
+#csvfileload(filename3,fileaddress3)
+#getrdf(filename3)
+targetFile3="/Users/Congcong/Desktop/owl/rdfoutput/"+filename3+"ontoResponse.owl"
+
+#query = "match(n) detach delete n"
+#test_graph.run(query)
+#print("####graphdb cleared#####")
+#csvfileload(filename4,fileaddress4)
+#getrdf(filename4)
+targetFile4="/Users/Congcong/Desktop/owl/rdfoutput/"+filename4+"ontoResponse.owl"
+
+#query = "match(n) detach delete n"
+#test_graph.run(query)
+#print("####graphdb cleared#####")
+#csvfileload(filename5,fileaddress5)
+#getrdf(filename5)
+targetFile5="/Users/Congcong/Desktop/owl/rdfoutput/"+filename5+"ontoResponse.owl"
+
+#print(" ###### check files : 'Desktop/owl/rdfoutput/outputfilenameintoResponse.owl'  ######")
+
+#YAMfilename1="generatedYamFile1" ######GIVE A NAME ####
+#YAMfile1="/Users/Congcong/Desktop/owl/YAMresponse/"+YAMfilename1+".xml"
+#YAM(targetFile1,targetFile2,YAMfile1)
+#destinationfilename = "Yamresults1.csv"
+#parseYAM(YAMfile1,destinationfilename)
+
+#print("###check /Users/Congcong/Desktop/owl/" + destinationfilename)
+#YAMresultcsv="/Users/Congcong/Desktop/owl/"+destinationfilename
+
+check=input("ready to connect META GRAPH ?('Y' or 'y' for ready): ")
+if check=='Y' or check=='y':
+    test_graph = Graph("http://localhost:7474", username=username2, password=password) ###connect to rdf database###
+    print("####connected to meta database###")
+#csvfileload(filename1,fileaddress1)
+#csvfileload(filename2,fileaddress2)
+
+#integrate(YAMresultcsv)
+
+####################################################################################
+############################### integrate third file stay in metabase ################################################
+#########################################################################
+#getrdf("TwoIntegrated")
+#print(" ###### check files : 'Desktop/owl/rdfoutput/outputfilenameintoResponse.owl'  ######")
+#sourcefile="/Users/Congcong/Desktop/owl/rdfoutput/TwoIntegratedontoResponse.owl"
+#YAMfilename3="generatedYamFile1" ######GIVE A NAME ####
+#YAMfile3="/Users/Congcong/Desktop/owl/YAMresponse/"+YAMfilename3+".xml"
+#YAM(sourcefile,targetFile3,YAMfile3)
+#destinationfilename = "Yamresults3.csv"
+#parseYAM(YAMfile3,destinationfilename)
+#print("###check /Users/Congcong/Desktop/owl/" + destinationfilename)
+#YAMresultcsv="/Users/Congcong/Desktop/owl/"+destinationfilename
+#csvfileload(filename3, fileaddress3)
+#integrate(YAMresultcsv)
+
+####################################################################################
+############################### integrate forth file stay in metabase ################################################
+#########################################################################
+#getrdf("ThirdIntegrated")
+#print(" ###### check files : 'Desktop/owl/rdfoutput/outputfilenameintoResponse.owl'  ######")
+#sourcefile="/Users/Congcong/Desktop/owl/rdfoutput/ThirdIntegratedontoResponse.owl"
+#YAMfilename4="generatedYamFile1" ######GIVE A NAME ####
+#YAMfile4="/Users/Congcong/Desktop/owl/YAMresponse/"+YAMfilename4+".xml"
+#YAM(sourcefile,targetFile4,YAMfile4)
+#destinationfilename = "Yamresults4.csv"
+#parseYAM(YAMfile4,destinationfilename)
+#print("###check /Users/Congcong/Desktop/owl/" + destinationfilename)
+#YAMresultcsv="/Users/Congcong/Desktop/owl/"+destinationfilename
+#csvfileload(filename4, fileaddress4)
+#integrate(YAMresultcsv)
+
+####################################################################################
+############################### integrate fifth file stay in metabase ################################################
+#########################################################################
+getrdf("FourthIntegrated")
+print(" ###### check files : 'Desktop/owl/rdfoutput/outputfilenameintoResponse.owl'  ######")
+sourcefile="/Users/Congcong/Desktop/owl/rdfoutput/FourthIntegratedontoResponse.owl"
+YAMfilename5="generatedYamFile1" ######GIVE A NAME ####
+YAMfile5="/Users/Congcong/Desktop/owl/YAMresponse/"+YAMfilename5+".xml"
+YAM(sourcefile,targetFile5,YAMfile5)
+destinationfilename = "Yamresults5.csv"
+parseYAM(YAMfile5,destinationfilename)
+print("###check /Users/Congcong/Desktop/owl/" + destinationfilename)
+YAMresultcsv="/Users/Congcong/Desktop/owl/"+destinationfilename
+csvfileload(filename5, fileaddress5)
+integrate(YAMresultcsv)

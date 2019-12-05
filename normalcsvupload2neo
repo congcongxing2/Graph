@@ -1,0 +1,111 @@
+###packages###
+from py2neo import Node, Relationship
+from py2neo import Graph, cypher
+import networkx as nwx
+import matplotlib.pyplot as plt
+import mysql.connector
+import pandas
+import requests
+import time
+
+filename1="DCU_PADDOCKESTIMATIONS"
+fileaddress1="file:///Users/Congcong/Desktop/owl/input/DCU_PADDOCKESTIMATIONS.csv"
+filename2="DCU_MANAGEMENDECISIONS"
+fileaddress2="file:///Users/Congcong/Desktop/owl/input/DCU_MANAGEMENDECISIONS.csv"
+
+
+data1=pandas.read_csv(fileaddress1, header=0)
+table1=filename1
+column1=[]
+for col in data1.columns:
+    print(col)
+    column1.append(col)
+
+data2=pandas.read_csv(fileaddress2, header=0)
+table2=filename2
+column2=[]
+for col in data2.columns:
+    print(col)
+    column2.append(col)
+
+print(table1, column1,table2,column2)
+
+
+
+
+# print(schemas,tables,columns)
+
+    ####CONNECT GRAGH###
+test_graph = Graph("http://localhost:7474", username="GraphRDF", password="12345677")
+query = "match(n) detach delete n"
+test_graph.run(query)
+    # cypher=test_graph.cypher
+print("####graphdb connected#####")
+
+t = 0
+table=[table1,table2]
+    #query = "create constraint on (a:table) assert a.name is unique"
+    #test_graph.run(query)
+print("Loading tables......")
+
+query = "create (:" + table[0] + "{name:" + "'" + table[0] + "'" + ", type: 'table', loadmark:'"+filename1+"'})"
+test_graph.run(query)
+print("###### Table Loaded ######")
+
+c = 0
+    #query = "create constraint on (a:column) assert a.name is unique"
+    #test_graph.run(query)
+print("Loading columns......")
+lc1=len(column1)
+while c < lc1:
+    query = "create (:" + column1[c] + "{name:" + "'" + column1[c] + "'" + ", type: 'column', loadmark:'"+filename1+"'})"
+    test_graph.run(query)
+    query = "match (b),(c) where b.name='" + table[0] + "' and c.name='" + column1[c] + "' merge (c)-[:belong_to{intable:'" + table[0] + "'" + ", cost:1}]->(b)"
+    test_graph.run(query)
+    c = c + 1
+
+
+print("###    file1   Loaded      ###")
+
+    #Invoke HTTP call to neo4j to retrieve onto file credential format: username:password
+ontoResponse = requests.get('http://neo4j:12345677@localhost:7474/rdf/onto')
+    #print(ontoResponse.text)
+f = open("/Users/Congcong/Desktop/owl/rdfoutput/"+filename1+"ontoResponse.owl", "w+")
+f.write(ontoResponse.text)
+f.close()
+print(ontoResponse.text)
+print("###    file1 rdf file saved in : 'Desktop/owl/rdfoutput'      ###")
+
+
+query = "match(n) detach delete n"
+test_graph.run(query)
+    # cypher=test_graph.cypher
+print("#### file1 cleared #####")
+####LOAD NODES###
+#SCHEMA SKIPPED#
+query = "create (:" + table[1] + "{name:" + "'" + table[1] + "'" + ", type: 'table', loadmark:'"+filename2+"'})"
+test_graph.run(query)
+
+d = 0
+#query = "create constraint on (a:column) assert a.name is unique"
+#test_graph.run(query)
+print("Loading columns......")
+lc2=len(column2)
+while d < lc2:
+    query = "create (:" + column2[d] + "{name:" + "'" + column2[d] + "'" + ", type: 'column', loadmark:'"+filename2+"'})"
+    test_graph.run(query)
+    query = "match (b),(c) where b.name='" + table[1] + "' and c.name='" + column2[d] + "' merge (c)-[:belong_to{intable:'" + table[1] + "'" + ", cost:1}]->(b)"
+    test_graph.run(query)
+    d = d + 1
+
+
+print("###    file2   Loaded      ###")
+
+#Invoke HTTP call to neo4j to retrieve onto file credential format: username:password
+ontoResponse = requests.get('http://neo4j:12345677@localhost:7474/rdf/onto')
+#print(ontoResponse.text)
+f = open("/Users/Congcong/Desktop/owl/rdfoutput/"+filename2+"ontoResponse.owl", "w+")
+f.write(ontoResponse.text)
+f.close()
+print(ontoResponse.text)
+print("###    file2 rdf file saved in : 'Desktop/owl/rdfoutput'      ###")

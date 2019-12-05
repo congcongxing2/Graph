@@ -1,0 +1,56 @@
+from xml.dom import minidom
+from xml.dom.minidom import Node
+import pandas
+import time
+
+starttime=time.time()
+destinationfilename="Yamresults.csv"
+xmldoc = minidom.parse('/Users/Congcong/Desktop/owl/YAMresponse/generatedYamFile.xml')
+
+
+cellList = xmldoc.getElementsByTagName("Cell")
+entity1=[]
+entity1=list(entity1)
+entity2=[]
+entity2=list(entity2)
+relation=[]
+relation=list(relation)
+score=[]
+score=list(score)
+i=0
+j=0
+for cell in cellList:
+    for x in cell.childNodes:
+        if x.nodeType != Node.TEXT_NODE:
+            if x.firstChild is not None:
+                    print("i=", i)
+
+                    print(x.firstChild.data)
+                    if i%2==0: relation.append(x.firstChild.data)
+                    else: score.append(x.firstChild.data)
+                    i = i + 1
+
+            else:
+                #print(x.tagName)
+                for attribute, value in x.attributes.items():
+                    #print(attribute, value)
+
+                    namespace = value.split("#")
+                    print("j=", j)
+
+                    print(namespace[1])
+                    if j%2==0:
+                        entity1.append(namespace[1])
+                    else: entity2.append(namespace[1])
+                    j = j + 1
+
+print("Parsing Done: i=%s, j=%s, %s pairs matched" %(i,j, i/2))
+
+data = {'entity1': entity1, 'entity2': entity2, 'relation': relation, 'score': score}
+df = pandas.DataFrame(data=data)
+df.to_csv("/Users/Congcong/Desktop/owl/"+destinationfilename, index=False, header=True)
+
+endtime=time.time()
+time=endtime-starttime
+
+print("csv File saved in '/Users/Congcong/Desktop/owl/', program time %s second" %time)

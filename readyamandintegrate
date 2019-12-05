@@ -1,0 +1,106 @@
+import pandas
+import py2neo
+import time
+from py2neo import Graph
+
+
+test_graph = Graph("http://localhost:7474", username="Graphmetabase", password="12345677")
+query = "match(n) detach delete n"
+test_graph.run(query)
+print("####graphdb connected#####")
+
+filename1="DCU_LIVESTOCKNUMBERS"
+fileaddress1="file:///Users/Congcong/Desktop/owl/input/DCU_LIVESTOCKNUMBERS.csv"
+filename2="DCU_MANAGEMENDECISIONS"
+fileaddress2="file:///Users/Congcong/Desktop/owl/input/DCU_MANAGEMENDECISIONS.csv"
+
+data1=pandas.read_csv(fileaddress1, header=0)
+table1=filename1
+column1=[]
+for col in data1.columns:
+    print(col)
+    column1.append(col)
+
+data2=pandas.read_csv(fileaddress2, header=0)
+table2=filename2
+column2=[]
+for col in data2.columns:
+    print(col)
+    column2.append(col)
+
+print(table1, column1,table2,column2)
+
+####LOAD NODES###
+
+t = 0
+table=[table1,table2]
+#query = "create constraint on (a:table) assert a.name is unique"
+#test_graph.run(query)
+print("Loading tables......")
+
+query = "create (:" + table[0] + "{name:" + "'" + table[0] + "'" + ", type: 'table', loadmark:'"+filename1+"'})"
+test_graph.run(query)
+print("###### Table Loaded ######")
+
+c = 0
+#query = "create constraint on (a:column) assert a.name is unique"
+#test_graph.run(query)
+print("Loading columns......")
+lc1=len(column1)
+while c < lc1:
+    query = "create (:" + column1[c] + "{name:" + "'" + column1[c] + "'" + ", type: 'column', loadmark:'"+filename1+"'})"
+    test_graph.run(query)
+    query = "match (b),(c) where b.name='" + table[0] + "' and c.name='"+column1[c]+"' and c.loadmark='" + table[0] + "' merge (c)-[:belong_to{intable:'" + table[0] + "'" + ", cost:1}]->(b)"
+    test_graph.run(query)
+    c = c + 1
+
+
+print("###    file1   Loaded      ###")
+
+
+####LOAD NODES###
+#SCHEMA SKIPPED#
+query = "create (:" + table[1] + "{name:" + "'" + table[1] + "'" + ", type: 'table', loadmark:'"+filename2+"'})"
+test_graph.run(query)
+
+d = 0
+#query = "create constraint on (a:column) assert a.name is unique"
+#test_graph.run(query)
+print("Loading columns......")
+lc2=len(column2)
+while d < lc2:
+    query = "create (:" + column2[d] + "{name:" + "'" + column2[d] + "'" + ", type: 'column', loadmark:'"+filename2+"'})"
+    test_graph.run(query)
+    query = "match (b),(c) where b.name='" + table[1] + "' and c.name='"+column2[d]+"' and c.loadmark='" + table[1] + "' merge (c)-[:belong_to{intable:'" + table[1] + "'" + ", cost:1}]->(b)"
+    test_graph.run(query)
+    d = d + 1
+
+
+print("###    file2   Loaded      ###")
+
+
+data=pandas.read_csv("/Users/Congcong/Desktop/owl/Yamresults.csv", header=0)
+print(data)
+entity1=data["entity1"]
+entity2=data["entity2"]
+score=data["score"]
+print(entity1,entity2,score)
+
+if len(entity1)==len(entity2)==len(score):
+    print("lenth check: GOOD")
+else: print("error from raw data")
+
+i=0
+while i<len(entity1):
+    if score[i]>0.8:
+        print(entity1[i], entity2[i], table[0],table[1])
+        check=input("Please confirm merge:"+entity1[i]+" and "+entity2[i]+" into one Node.('Y' for comfirm, type other key to cnacel :)")
+        if check=='Y' or 'y':
+            query="MATCH (a:"+entity1[i]+" {name:'"+entity1[i]+"', loadmark:'DCU_LIVESTOCKNUMBERS'}),(b:"+entity2[i]+" {name:'"+entity2[i]+"', loadmark:'DCU_MANAGEMENDECISIONS'}) WITH * LIMIT 1 call apoc.refactor.mergeNodes([a,b]) yield node return 'none'"
+            test_graph.run(query)
+            print("Nodes Integrated")
+            i=i+1
+        elif check!='Y' or 'y': i=i+1
+
+if i==len(entity1): print("###### Integration Done. Check Neo4j ######")
+else: print("Errors occured, please check.")

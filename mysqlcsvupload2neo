@@ -1,0 +1,117 @@
+###packages###
+from py2neo import Node, Relationship
+from py2neo import Graph, cypher
+import networkx as nwx
+import matplotlib.pyplot as plt
+import mysql.connector
+import pandas
+import requests
+
+###extract nodes from information_schema from MYSQL Database###
+# mydb=mysql.connector.connect(host="localhost", user="root",password="12345677",db="dublinbus")
+# cursor=mydb.cursor()
+# query=()
+# node=pandas.dataframe(cursor.execute(query))
+####
+
+filename="file1"
+fileaddress="file:///Users/Congcong/Desktop/owl/datas_test_rawdb_schemas.csv"
+
+node = pandas.read_csv(fileaddress, header=0)
+node = pandas.DataFrame(data=node)
+print("###Read nodes finished###")
+
+schemalist = node["table_schema"]
+ttablelist = node["table_name"]
+tcolumnlist = node['column_name']
+i=0
+columnlist=[]
+while i<len(tcolumnlist):
+    columnlist.append(tcolumnlist[i].replace(" ","_"))
+    i=i+1
+j=0
+tablelist=[]
+while j<len(ttablelist):
+    tablelist.append(ttablelist[j].replace(".", "_"))
+    j = j + 1
+#print(schemalist,tablelist,columnlist)
+
+schemas = list(set(list(schemalist)))
+tables = list(set(list(tablelist)))
+columns = list(set(list(columnlist)))
+print(schemalist,tablelist,columnlist)
+
+ls = len(schemas)
+lt = len(tables)
+lc = len(columns)
+lcl = len(columnlist)
+print(ls, lt,lc,lcl)
+
+
+print(schemas,tables,columns)
+schemas = list(set(list(schemalist)))
+tables = list(set(list(tablelist)))
+columns = list(set(list(columnlist)))
+print(schemalist,tablelist,columnlist)
+
+ls = len(schemas)
+lt = len(tables)
+lc = len(columns)
+lcl = len(columnlist)
+print(ls, lt,lc,lcl)
+
+# print(schemas,tables,columns)
+
+####CONNECT GRAGH###
+test_graph = Graph("http://localhost:7474", username="GraphDcuDesk", password="12345677")
+query = "match(n) detach delete n"
+test_graph.run(query)
+# cypher=test_graph.cypher
+print("####graphdb connected#####")
+####LOAD NODES###
+s = 0
+#query = "create constraint on (a:schema) assert a.name is unique"
+#test_graph.run(query)
+print("loading schemas......")
+while s < ls:
+    query = "create (:"+schemas[s]+"{name:'" + schemas[s]+ "'" +", type:'schema', loadmark:'"+filename+"'})"
+    test_graph.run(query)
+    s = s + 1
+t = 0
+#query = "create constraint on (a:table) assert a.name is unique"
+#test_graph.run(query)
+print("Loading tables......")
+while t < lt:
+    query = "create (:" + tables[t] + "{name:" + "'" + tables[t] + "'" + ", type: 'table', loadmark:'"+filename+"'})"
+    test_graph.run(query)
+    t = t + 1
+c = 0
+#query = "create constraint on (a:column) assert a.name is unique"
+#test_graph.run(query)
+print("Loading columns......")
+while c < lc:
+    query = "create (:" + columns[c] + "{name:" + "'" + columns[c] + "'" + ", type: 'column', loadmark:'"+filename+"'})"
+    test_graph.run(query)
+    c = c + 1
+
+###LOAD CONNECTIONS###
+l = 0
+
+print("Loading relationships......")
+while l < len(columnlist):
+    query = "match (b),(c) where b.name='" + tablelist[l] + "' and c.name='" + columnlist[
+        l] + "' merge (c)-[:belong_to{intable:'" + tablelist[l] + "'" + ", cost:1}]->(b)"
+    test_graph.run(query)
+    query = "match(a),(b) where a.name='" + schemalist[l] + "' and b.name='" + tablelist[
+        l] + "' merge (b)-[:belong_to{inschema:'" + schemalist[l] + "'" + ", cost:1}]->(a)"
+    test_graph.run(query)
+    l = l + 1
+
+print("###      Loaded      ###")
+
+#Invoke HTTP call to neo4j to retrieve onto file credential format: username:password
+ontoResponse = requests.get('http://neo4j:12345677@localhost:7474/rdf/onto')
+#print(ontoResponse.text)
+f = open("/Users/Congcong/Desktop/owl/"+filename+"ontoResponse.owl", "w+")
+f.write(ontoResponse.text)
+f.close()

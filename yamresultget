@@ -1,0 +1,46 @@
+import requests
+import xml.etree.ElementTree as ET
+from py2neo import Graph
+
+filename1="DCU_LIVESTOCKNUMBERS"
+filename2="DCU_MANAGEMENDECISIONS"
+sourceFile="/Users/Congcong/Desktop/owl/rdfoutput/"+filename1+"ontoResponse.owl"
+targetFile="/Users/Congcong/Desktop/owl/rdfoutput/"+filename2+"ontoResponse.owl"
+
+#Invoke HTTP call to neo4j to retrieve onto file credential format: username:password
+#ontoResponse = requests.get('http://neo4j:12345677@localhost:7474/rdf/onto')
+#print(ontoResponse.text)
+#f = open("/Users/Congcong/Desktop/owl/ontoResponse.owl", "w+")
+#f.write(ontoResponse.text)
+#f.close()
+
+# data = {
+#   'sourceUrl': 'https://raw.githubusercontent.com/DOREMUS-ANR/knowledge-base/master/vocabularies/genre-redomi.ttl',
+#   'targetUrl': 'https://raw.githubusercontent.com/DOREMUS-ANR/knowledge-base/master/vocabularies/genre-rameau.ttl',
+#   'apikey': '41lahii2if9lv01i'
+# }
+
+data = {
+  'apikey': '41lahii2if9lv01i'
+}
+
+files = {'sourceFile': open(sourceFile,'rb'),
+         'targetFile': open(targetFile,'rb')}
+
+response = requests.post('http://yamplusplus.lirmm.fr/api/matcher', data=data, files=files)
+print(response)
+print(response.text)
+
+f = open("/Users/Congcong/Desktop/owl/YAMresponse/generatedYamFile.xml", "w+")
+f.write(response.text)
+f.close()
+
+print("###### Alignment file saved in Desktop/owl/YAMresponse ######")
+
+
+
+# TODO check if the reponse status code is 200 meaning it was successfull
+#rootResponse = ET.fromstring(response.text)
+
+# TODO process the xml file and retrieving the relevant infomation which are the aligntment values
+

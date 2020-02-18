@@ -1,0 +1,60 @@
+import csv
+import py2neo
+from py2neo import Graph
+
+
+nodeNameAndTypeMap = dict()
+nodeRelationshipMap = dict()
+with open('DCU_LIVESTOCKNUMBERS.csv') as csvfile:
+    reader = csv.DictReader(csvfile)
+    index = 1;
+    for row in reader:
+        for item in row.items():
+            #ignore null
+            if not item[0] or not item[1]:
+                continue
+            else:
+                thisNode = item[1]
+                if csvfile.name+str(index) in nodeRelationshipMap.keys():
+                    nodeRelationshipMap[csvfile.name+str(index)].append(thisNode)
+                else:
+                    nodeRelationshipMap[csvfile.name + str(index)]=list()
+                    nodeRelationshipMap[csvfile.name + str(index)].append(thisNode)
+                #only add unique keys for nodeNameAndTypeMap
+                if item[1] in nodeNameAndTypeMap.keys():
+                    continue
+                else:
+                    nodeNameAndTypeMap[item[1]] = item[0]
+        index+=1
+
+#print(nodeNameAndTypeMap)
+########print(nodeRelationshipMap)
+
+
+    ####CONNECT GRAGH###
+test_graph = Graph("http://localhost:7474", username="GraphDcuDesk", password="12345677")
+query = "match(n) detach delete n"
+test_graph.run(query)
+print("####graphdb connected#####")
+
+print("####start node creation####")
+for item in nodeNameAndTypeMap.items():
+    currentItem = py2neo.Node(item[0], Class=item[1], value=item[0])
+    ########print("####current node to be created####", item[0], " class:", item[1])
+    test_graph.create(currentItem)
+    # cypher=test_graph.cypher
+    ########print("####node created####")
+
+matcher = py2neo.NodeMatcher(test_graph)
+print("####start relationship creation####")
+for item in nodeRelationshipMap.items():
+    nodeList = list(item[1])
+    for node1Name in nodeList:
+        for node2Name in nodeList:
+            if node1Name != node2Name:
+                node1 = matcher.match(value=node1Name).first()
+                node2 = matcher.match(value=node2Name).first()
+                ########print("####creating relationship#### " + str(node1), str(node2))
+                relationship = py2neo.Relationship(node1, item[0], node2)
+                test_graph.create(relationship)
+print("####relationship creation finished####")

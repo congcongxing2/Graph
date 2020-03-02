@@ -1,0 +1,129 @@
+###packages###
+from py2neo import Node, Relationship
+from py2neo import Graph, cypher
+import networkx as nwx
+import matplotlib.pyplot as plt
+import mysql.connector
+import pandas
+
+filename1="DCU_LIVESTOCKNUMBERS"
+fileaddress1="C:/Users/Congcong/Desktop/owl/input/DCU_LIVESTOCKNUMBERS.csv"
+nodelimit=200
+ratiolimit=0.8
+fillnaas=0
+data1=pandas.read_csv(fileaddress1, header=0)
+data=pandas.DataFrame(data=data1)
+data=data.fillna(fillnaas)
+test={}
+test['node']=list()
+test['record']=list()
+
+# print(type('0'))
+strchecklist=['ID', 'Date','City','Location']
+for col in data.columns:
+    print("checking column:",col)
+
+    #print("checking specific words......")
+    if col!=fillnaas:
+        i=0
+        while i<len(strchecklist):
+            if strchecklist[i] in col:
+                #print(i)
+                test['node'].append(col)
+                print(col, " should be NODES due to NAME")
+                i=len(strchecklist)+1
+            else: i=i+1
+        #print(i)
+        if i==len(strchecklist):
+            #print("no specific col name found")
+            #print("checking 'fillna' effects......")
+            if fillnaas in set(data[col]):
+                #print("contain N/A")
+                if list(data[col]).count(fillnaas) / len(data[col]) > ratiolimit:
+                    #print("ATTENTION: 'fillnaas' value attention: Ratio too high")
+                    j = 0
+                    while j < len(data[col]):
+                        #print(j)
+                        if data[col][j] != fillnaas:
+                            try:
+                                val = int(data[col][j])
+                                #print("integer number column")
+                                if len(set(data[col])) > nodelimit:
+                                    test['record'].append(col)
+                                    print(col, " should be RECORDS due to set[col] length limit")
+                                    break
+                                elif len(set(data[col])) / len(data[col]) > ratiolimit:
+                                    test['record'].append(col)
+                                    print(col, " should be RECORDS due to set[col] ratio limit")
+                                    break
+                                else:
+                                    test['node'].append(col)
+                                    print(col, " should be NODES with INTEGER FILLNA ALERT")
+                                    break
+
+                            except ValueError:
+                                try:
+                                    val = float(data[col][j])
+                                    #print("float  number column")
+                                    if len(set(data[col])) > nodelimit:
+                                        test['record'].append(col)
+                                        print(col, " should be RECORDS due to set[col] length limit")
+                                        break
+                                    elif len(set(data[col])) / len(data[col]) > ratiolimit:
+                                        test['record'].append(col)
+                                        print(col, " should be RECORDS due to set[col] ratio limit")
+                                        break
+                                    else:
+                                        test['node'].append(col)
+                                        print(col, " should be NODES with FLOAT FILLNA ALERT")
+                                        break
+                                except ValueError:
+                                    #print("string column, 'fillnaas' value attention")
+                                    if len(set(data[col])) > nodelimit:
+                                        test['record'].append(col)
+                                        print(col, " should be RECORDS due to set[col] length limit")
+                                        break
+                                    elif len(set(data[col])) / len(data[col]) > ratiolimit:
+                                        test['record'].append(col)
+                                        print(col, " should be RECORDS due to set[col] ratio limit")
+                                        break
+                                    else:
+                                        test['node'].append(col)
+                                        print(col, " should be NODES with STRING FILLNA ALERT")
+                                        break
+                        else:
+                            j = j + 1
+                else:
+                    #print('not many N/A')
+                    #print("checking set(col) length: ", len(set(data[col])))
+                    if len(set(data[col])) > nodelimit:
+                        test['record'].append(col)
+                        print(col, " should be RECORDS due to set[col] length limit")
+                    elif len(set(data[col])) / len(data[col]) > ratiolimit:
+                        test['record'].append(col)
+                        print(col, " should be RECORDS due to set[col] ratio limit")
+                    else:
+                        test['node'].append(col)
+                        print(col, " should be NODES with good set length/ratio")
+            else:
+                #print("no N/A")
+                #print("checking set(col) length: ", len(set(data[col])))
+                if len(set(data[col])) > nodelimit:
+                    test['record'].append(col)
+                    print(col, " should be RECORDS due to set[col] length limit")
+                elif len(set(data[col])) / len(data[col]) > ratiolimit:
+                    test['record'].append(col)
+                    print(col, " should be RECORDS due to set[col] ratio limit")
+                else:
+                    test['node'].append(col)
+                    print(col, " should be NODES with good set length/ratio")
+
+
+        print(col,"/len(set):",len(set(data[col])), "/ratio:", len(set(data[col]))/len(data[col]), "/N/A ratio:",list(data[col]).count(fillnaas) / len(data[col]), "/" )
+    else:
+        print("ALERT: col name missing, MANUALLY CHECK COL NAME!")
+        break
+
+print(test['node'])
+print(test['record'])
+
